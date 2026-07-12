@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+      - run: cargo check --locked --all-targets
+      - run: cargo test --locked --all-targets
+
+  current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked --all-targets
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
+      - run: cargo test --locked --doc
+      - run: cargo check --locked --benches
+      - run: cargo package --list
+      - run: cargo tree --locked -e features
+      - uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Reject non-public dependency sources
+        run: |
+          ! grep -E 'source = "(git\+ssh|git\+https://[^\"]*@|path\+)' Cargo.lock
