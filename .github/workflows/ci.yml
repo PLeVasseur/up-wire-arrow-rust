@@ -22,17 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.95.0
           components: clippy,rustfmt
-      - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo test --locked --all-targets
-      - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
-      - run: cargo test --locked --doc
-      - run: cargo check --locked --benches
-      - run: cargo package --list
-      - run: cargo tree --locked -e features
+      - run: cargo +1.95.0 fmt --check
+      - run: cargo +1.95.0 clippy --locked --all-targets -- -D warnings
+      - run: cargo +1.95.0 test --locked --all-targets
+      - run: RUSTDOCFLAGS="-D warnings" cargo +1.95.0 doc --locked --no-deps
+      - run: cargo +1.95.0 test --locked --doc
+      - run: cargo +1.95.0 check --locked --benches
+      - run: cargo +1.95.0 package --list
+      - run: cargo +1.95.0 tree --locked -e features
       - uses: EmbarkStudios/cargo-deny-action@v2
       - name: Reject non-public dependency sources
         run: |
