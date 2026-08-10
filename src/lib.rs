@@ -20,17 +20,19 @@ use arrow_ipc::writer::StreamWriter;
 use arrow_ipc::MessageHeader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use bytes::Bytes;
-use up_rust::selected_wire_user_api::{UNativePrefixWireTransport, UWithNativePrefixWire};
-use up_rust::wire_implementer_api::{
-    UProtocolNativeWire, UWire, UWirePayload, WireIdentity, NATIVE_PREFIX_METADATA_LAYOUT_ID,
-};
 use up_rust::{
-    DecodePayload, EncodePayload, PayloadEncoding, PayloadFormat, PayloadLayout, ReadDecodePayload,
-    UWireError,
+    DecodePayload, EncodePayload, PayloadCodecIdentity, PayloadDecodeLimit, PayloadEncoding,
+    PayloadLayout, ReadDecodePayload, UNativePrefixWireTransport, UProtocolNativeWire, UWire,
+    UWireError, UWirePayload, UWithNativePrefixWire, WireIdentity,
+    NATIVE_PREFIX_METADATA_LAYOUT_ID,
 };
 
 /// Maximum accepted or produced Arrow IPC payload size (64 MiB).
 pub const MAX_ARROW_PAYLOAD_LEN: usize = 64 * 1024 * 1024;
+
+/// Encoded-input policy for Arrow IPC reader paths.
+pub const ARROW_IPC_DECODE_LIMIT: PayloadDecodeLimit =
+    PayloadDecodeLimit::new(MAX_ARROW_PAYLOAD_LEN);
 
 /// Provisional local/experimental selected-wire identity.
 ///
@@ -48,11 +50,8 @@ pub const ARROW_PAYLOAD_FAMILY_ID: WireIdentity = WireIdentity::new(
     0xA202,
 );
 
-/// Payload encoding identifier carried in frame metadata.
-pub const ARROW_ENCODING_ID: &str = "up.arrow-ipc-stream";
-
-/// MIME media type for an Arrow IPC stream.
-pub const ARROW_CONTENT_TYPE: &str = "application/vnd.apache.arrow.stream";
+/// Registered Arrow IPC payload encoding (registry entry 10).
+pub const ARROW_PAYLOAD_ENCODING: PayloadEncoding = PayloadEncoding::from_registry_entry(10);
 
 const IPC_CONTINUATION_MARKER: u32 = 0xFFFF_FFFF;
 const IPC_EOS: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0];
@@ -77,14 +76,13 @@ impl UWire for ArrowWire {
     const FORMAT_VERSION: u16 = UProtocolNativeWire::FORMAT_VERSION;
 }
 
-impl PayloadFormat for ArrowWire {
+impl PayloadCodecIdentity for ArrowWire {
     fn name() -> &'static str {
         "arrow-ipc-stream"
     }
 
     fn encoding() -> PayloadEncoding {
-        PayloadEncoding::custom(ARROW_ENCODING_ID, ARROW_CONTENT_TYPE)
-            .expect("static Arrow payload encoding is valid")
+        ARROW_PAYLOAD_ENCODING
     }
 }
 
@@ -152,7 +150,14 @@ where
     fn decode_payload_from_reader<R: Read>(
         mut reader: R,
         payload_len: usize,
+        limit: PayloadDecodeLimit,
     ) -> Result<T, UWireError> {
+        if payload_len > limit.max_payload_bytes() {
+            return Err(UWireError::invalid_payload(format!(
+                "advertised payload length {payload_len} exceeds configured input limit {}",
+                limit.max_payload_bytes()
+            )));
+        }
         ensure_payload_limit(payload_len)?;
         let mut bytes = vec![0_u8; payload_len];
         reader.read_exact(&mut bytes).map_err(|error| {
@@ -160,6 +165,16 @@ where
                 "Arrow payload reader did not yield the declared {payload_len} bytes: {error}"
             ))
         })?;
+        let mut overrun = [0_u8; 1];
+        match reader.read(&mut overrun) {
+            Ok(0) => {}
+            Ok(_) => {
+                return Err(UWireError::invalid_payload(
+                    "Arrow payload reader yielded bytes beyond the advertised length",
+                ));
+            }
+            Err(error) => return Err(UWireError::invalid_payload(error.to_string())),
+        }
         decode_value(&bytes)
     }
 }
@@ -460,6 +475,8 @@ mod tests {
 
     use super::*;
 
+    const TEST_LIMIT_BELOW_ADVERTISED_LEN: PayloadDecodeLimit = PayloadDecodeLimit::new(15);
+
     fn encode(table: &TelemetryTableV1) -> Vec<u8> {
         <ArrowWire as EncodePayload<TelemetryTableV1>>::encode_payload_owned(table)
             .expect("encode fixture")
@@ -495,6 +512,7 @@ mod tests {
             <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
                 Cursor::new(&bytes),
                 bytes.len(),
+                ARROW_IPC_DECODE_LIMIT,
             )
             .expect("reader decode");
         assert_eq!(actual, expected);
@@ -693,6 +711,7 @@ mod tests {
             <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
                 ShortReader,
                 16,
+                ARROW_IPC_DECODE_LIMIT,
             ),
         );
     }
@@ -711,6 +730,32 @@ mod tests {
             <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
                 PanicReader,
                 MAX_ARROW_PAYLOAD_LEN + 1,
+                ARROW_IPC_DECODE_LIMIT,
+            ),
+        );
+    }
+
+    #[test]
+    fn configured_reader_limit_is_enforced_before_reading() {
+        assert_invalid(
+            <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
+                PanicReader,
+                16,
+                TEST_LIMIT_BELOW_ADVERTISED_LEN,
+            ),
+        );
+    }
+
+    #[test]
+    fn reader_overrun_is_rejected() {
+        let mut bytes = encode(&TelemetryTableV1::fixture(4, 1));
+        let payload_len = bytes.len();
+        bytes.push(0);
+        assert_invalid(
+            <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
+                Cursor::new(bytes),
+                payload_len,
+                ARROW_IPC_DECODE_LIMIT,
             ),
         );
     }
@@ -744,6 +789,8 @@ mod tests {
         }
         assert_eq!(ArrowWire::WIRE_ID, ARROW_WIRE_ID);
         assert_eq!(ArrowWire::PAYLOAD_FAMILY_ID, ARROW_PAYLOAD_FAMILY_ID);
+        assert_eq!(ARROW_PAYLOAD_ENCODING.id(), 10);
+        assert_eq!(ArrowWire::encoding(), ARROW_PAYLOAD_ENCODING);
         assert_eq!(
             ArrowWire::METADATA_LAYOUT_ID,
             NATIVE_PREFIX_METADATA_LAYOUT_ID
