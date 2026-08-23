@@ -979,7 +979,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
@@ -1053,7 +1053,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 [[package]]
 name = "up-rust"
 version = "0.10.0-SNAPSHOT"
-source = "git+https://github.com/PLeVasseur/up-rust.git?rev=7a82babfa7f94aed5b7aac1ac81babff20747bf2#7a82babfa7f94aed5b7aac1ac81babff20747bf2"
+source = "git+https://github.com/PLeVasseur/up-rust.git?rev=c1d13ca31859b9cc0086ef5d4b953907f24094ec#c1d13ca31859b9cc0086ef5d4b953907f24094ec"
 dependencies = [
  "async-trait",
  "bytes",
