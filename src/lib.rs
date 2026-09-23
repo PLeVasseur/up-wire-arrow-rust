@@ -50,8 +50,9 @@ pub const ARROW_PAYLOAD_FAMILY_ID: WireIdentity = WireIdentity::new(
     0xA202,
 );
 
-/// Registered Arrow IPC payload encoding (registry entry 10).
-pub const ARROW_PAYLOAD_ENCODING: PayloadEncoding = PayloadEncoding::from_registry_entry(10);
+/// Deployment-private encoding for this complete Arrow IPC stream profile.
+/// Peers must agree to reserve this ID for the documented representation.
+pub const ARROW_PAYLOAD_ENCODING: PayloadEncoding = PayloadEncoding::from_registry_entry(0xF002);
 
 const IPC_CONTINUATION_MARKER: u32 = 0xFFFF_FFFF;
 const IPC_EOS: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0];
@@ -789,7 +790,7 @@ mod tests {
         }
         assert_eq!(ArrowWire::WIRE_ID, ARROW_WIRE_ID);
         assert_eq!(ArrowWire::PAYLOAD_FAMILY_ID, ARROW_PAYLOAD_FAMILY_ID);
-        assert_eq!(ARROW_PAYLOAD_ENCODING.id(), 10);
+        assert_eq!(ARROW_PAYLOAD_ENCODING.id(), 0xF002);
         assert_eq!(ArrowWire::encoding(), ARROW_PAYLOAD_ENCODING);
         assert_eq!(
             ArrowWire::METADATA_LAYOUT_ID,

@@ -26,6 +26,14 @@ The compact IDs `0xA201` (wire) and `0xA202` (payload family) are unique within
 this crate and lie in up-rust's `0x8000..=0xFFFE` local/experimental range. They
 are provisional and are not globally registered interoperability identities.
 
+Selecting `ArrowWire` also opts into deployment-private payload encoding `0xF002`
+for the exact IPC stream contract above. Peers must agree to and reserve that
+assignment across their shared private-ID budget, including native-profile tables.
+It is not a public registry allocation; the earlier proposed public ID 10 is
+unassigned and is no longer emitted. This candidate reserves `0xF001`/`0xF002`/
+`0xF003` for XCDRv2/Arrow/OMG IDL serialized profiles. Native structural tokens are
+separate metadata and are not produced by the Arrow codec.
+
 ## Encoding Costs
 
 Arrow IPC has dynamic size. `payload_layout` performs one complete probe
