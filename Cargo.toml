@@ -13,7 +13,7 @@ arrow-array = { version = "58.0.0", default-features = false }
 arrow-ipc = { version = "58.0.0", default-features = false }
 arrow-schema = { version = "58.0.0", default-features = false }
 bytes = { version = "1.11.1", default-features = false }
-up-rust = { version = "=0.10.0-SNAPSHOT", git = "https://github.com/PLeVasseur/up-rust.git", rev = "f531712c63d811d402bcf4425d6a6ec8c288a361", default-features = false, features = ["selected-wire-user-api", "wire-implementer-api"] }
+up-rust = { version = "=0.10.0-SNAPSHOT", git = "https://github.com/PLeVasseur/up-rust.git", rev = "1c139340a04ff427a7972588958649a2b496044d", default-features = false, features = ["selected-wire-user-api", "wire-implementer-api"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", default-features = false }
