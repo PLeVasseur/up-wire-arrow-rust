@@ -4,7 +4,7 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use up_rust::{DecodePayload, EncodePayload, ReadDecodePayload};
-use up_wire_arrow::{ArrowWire, TelemetryTableV1};
+use up_wire_arrow::{ArrowWire, TelemetryTableV1, ARROW_IPC_DECODE_LIMIT};
 
 const ROW_COUNTS: [usize; 3] = [64, 4_096, 65_536];
 
@@ -92,6 +92,7 @@ fn reader_decode(c: &mut Criterion) {
                 <ArrowWire as ReadDecodePayload<TelemetryTableV1>>::decode_payload_from_reader(
                     black_box(encoded.as_ref()),
                     encoded.len(),
+                    ARROW_IPC_DECODE_LIMIT,
                 )
                 .expect("reader decode")
             });
